@@ -1,0 +1,43 @@
+# idea =
+#   attr:
+#     classes: ['coffee']
+# if node.constructor.name == 'Literal'
+#   idea =
+#     title: node.value
+#     attr:
+#       style:
+#         color: '#55AA55'
+#   return idea
+# properties = {}
+# proppos = 1
+# if node.children?
+#   for property in node.children
+#     if node[property]?
+#       ideas = {}
+#       position = 1
+#       if node[property].length? and node[property].length > 0
+#         for childNode in node[property]
+#           ideas[position] = @CoffeeScript(property,childNode)
+#           position += 10
+#       else if node[property].length?
+#         continue
+#       else
+#         ideas[position] = @CoffeeScript(property,node[property])
+#         position += 10
+#       properties[proppos] =
+#         title: '.' + property + ':'
+#         attr:
+#           style:
+#             background: 'rgba(200,200,200,.2)'
+#             color: '#444444'
+#             border: 'none'
+#         ideas: ideas
+#       proppos += 10
+# idea =
+#   title: node.constructor.name
+#   ideas: properties
+#   attr:
+#     type: node.constructor.name
+#     property: attribute
+#     #classes: classes
+# return idea

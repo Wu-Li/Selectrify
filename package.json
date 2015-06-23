@@ -1,0 +1,22 @@
+{
+  "name": "chemistry",
+  "main": "./lib/chemistry",
+  "version": "0.0.0",
+  "description": "A short description of your package",
+  "keywords": [
+  ],
+  "activationCommands": {
+  },
+  "repository": "https://github.com/atom/chemistry",
+  "license": "MIT",
+  "engines": {
+    "atom": ">=0.207.0 <2.0.0"
+  },
+  "dependencies": {
+    "coffee-script": "latest",
+    "atom-space-pen-views": "latest"
+  },
+  "comments": {
+    "atom-workspace": "chemistry:toggle"
+  }
+}

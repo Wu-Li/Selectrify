@@ -1,0 +1,26 @@
+# See https://atom.io/docs/latest/hacking-atom-package-word-count#menus for more details
+'context-menu':
+  'atom-text-editor': [
+    {
+      'label': 'Toggle chemistry'
+      'command': 'chemistry:toggle'
+    }
+    {
+      'label': 'Draw Datacule'
+      'command': 'chemistry:draw'
+    }
+  ]
+'menu': [
+  {
+    'label': 'Packages'
+    'submenu': [
+      'label': 'chemistry'
+      'submenu': [
+        {
+          'label': 'Toggle'
+          'command': 'chemistry:toggle'
+        }
+      ]
+    ]
+  }
+]
