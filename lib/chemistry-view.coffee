@@ -5,7 +5,7 @@ class ChemistryView extends View
   @content: ->
     @div class: "chemistry" , =>
       @div class: "chemistry-resize-handle"
-      @div id: "tray", =>
+      @div class: "tray", =>
         @button class: 'scaleUp'
         @button class: 'scaleDown'
         @div =>
@@ -13,12 +13,17 @@ class ChemistryView extends View
             @input type: 'checkbox', id: 'edges', class: 'toggleEdges'
             @span ''
         @div =>
+          @label 'ids', for: 'ids', =>
+            @input type: 'checkbox', id: 'ids', class: 'toggleIDs'
+            @span ''
+        @div =>
           @label 'types', for: 'types', =>
             @input type: 'checkbox', id: 'types', class: 'toggleTypes'
             @span ''
+        @label 'query', for: 'query'
+        @div id: 'query', class: 'native-key-bindings', contentEditable: 'true'
 
-
-      @div id: "container"
+      @div id: "laboratory"
 
   initialize: (state) ->
     @on 'mousedown', '.chemistry-resize-handle', (e) => @resizeStarted(e)

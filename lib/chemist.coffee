@@ -1,123 +1,171 @@
-MAPJS = require './mapjs/src/mapjs'
-root.Datacule = Datacule = require('./datacule')
+{File} = require 'atom'
+MAPJS = require './mapjs/mapjs'
+levelgraph = require '../js/levelgraph.min'
+Datacule = require './datacule'
+Cursor = require './db/cursor'
 
 module.exports =
   class Chemist
-    constructor: () ->
+    constructor: (projectPaths) ->
       @mapModel = MAPJS.init()
-      @datacules = {}
-      @edges = false
-      @types = false
+      @directories = {}
+      @loadProject projectPaths
       @activeTab = undefined
       @activeMap = undefined
+      @cursor = new Cursor()
 
-    loadItem: (paneItem) ->
-      if paneItem.constructor.name == 'TextEditor'
-        title = paneItem.getTitle?()
-        if !@datacules[title]
-          path = paneItem.getPath().replace(/\\/g,"\\\\")
-          @datacules[title] = new Datacule path
+    loadProject: (projectPaths) ->
+      openDirectories = Object.getOwnPropertyNames(@directories)
+      for path in projectPaths
+        if !(path in openDirectories)
+          @loadDirectory path
+    loadDirectory: (path) ->
+      @directories[path] =
+        db: levelgraph(path)
+        datacules: {}
 
-    tab: (paneItem) ->
-      @activeTab = paneItem.getTitle?()
+    mappable: ['coffee']
+    getDirPath: (item) =>
+      if item?.constructor.name == 'TextEditor'
+        if item.getTitle()?.split('.').pop() in @mappable
+          fullPath = item.getPath?()
+          [dir,path] = atom.project.relativizePath(fullPath)
+          if @directories[dir]?
+            return [dir,path]
 
-    draw: (title) ->
-      if !@activeTab and !@activeMap and !title then return
-      if !title then title = @activeTab
-      @activeMap = title
-      clean = MAPJS.content {title:''}
-      @mapModel.setIdea(clean)
-      map = @datacules[@activeMap].map
-      idea = MAPJS.content @map2idea map
-      @mapModel.setIdea(idea)
+    getDatacule: (dirPath) => @directories[dirPath[0]]?.datacules[dirPath[1]]
+
+    loadItem: (item) =>
+      if dirPath = @getDirPath item
+        item.saveSubscription?.dispose()
+        @loadFile(dirPath[0],dirPath[1],item)
+      else if item?.constructor.name == 'TextEditor'
+        item.saveSubscription = item.getBuffer().onDidSave @loader item
+    loadFile: (dir,path,item) =>
+      if !@getDatacule([dir,path])
+        if file = new File dir + '/' + path
+          db = @directories[dir].db
+          @directories[dir].datacules[path] = new Datacule db,path,file,item
+    loader: (item) => return () => @loadItem item
+
+    tab: (item) -> @activeTab = @getDirPath(item)
+    activate: () ->
+      if @activeTab
+        @datacule?.active = false
+        @datacule = @getDatacule @activeTab
+        @datacule.active = true
+        @db = @directories[@activeTab[0]].db
+        @datacule.refresh()
+    draw: (map) ->
+      if map?
+        @activeMap = @activeTab
+        @map = map
+        clean = MAPJS.content {title:''}
+        @mapModel.setIdea(clean)
+        idea = MAPJS.content @map2idea @map
+        @mapModel.setIdea(idea)
       return
 
-    save: (title) ->
-      if !title then title = @title
-      @datacules[title].save()
+    #Active datacule shortcuts
+    refresh: () -> @datacule?.refresh()
+    select: () -> @datacule?.select()
+    remove: () -> @datacule?.remove()
+    insert: (map) -> @datacule?.insert map
+    get: () -> @datacule?.get @cursor
+    wipe: () ->
+      paths = Object.getOwnPropertyNames(@directories)
+      for path in paths
+        db = @directories[path].db
+        db.get {},(e,r) ->
+          db.del r,(e) ->
+            if e? then console.log e
+            else console.log "deleted #{r.length} rows from #{path}"
 
-    saveAll: ->
-      keys = Object.keys(@datacules)
-      for key in keys
-        @datacules[key].save()
-
-    select: (query,title) ->
-      if !title then title = @title
-      @datacules[title].select(query)
-
-    delete: (query,title) ->
-      if !title then title = @title
-      @datacules[title].delete(query)
-
+    #Map <=> Idea
     map2idea: (map) ->
       subIdeas = {}
-      position = 1
-      keys = Object.getOwnPropertyNames(map.children)
+      keys = Object.getOwnPropertyNames(map._children)
       for key in keys
-        for child in map.children[key]
-          subIdeas[position] = @map2idea child
-          position += 10
-      classes = []
-      if @edges then classes.push 'show-edges'
-      if @types then classes.push 'show-types'
-      if map.id == 1 then classes = []
+        for child in map._children[key]
+          kid = child._id.split(':')[1]
+          if key == 'chain' then kid = kid * 32
+          subIdeas[kid] = @map2idea child
       idea =
-        id: map.id
-        title: map.value
+        id: map._id.split(':')[1]
+        title: map._value
+        attr: map._attr
         ideas: subIdeas
-        attr:
-          type: map.type
-          edge: map.edge
-          path: map.path
-          scope: map.scope
-          classes: map.classes.concat classes
       return idea
-
     idea2map: (idea) ->
-      if !idea then idea = @mapModel.getIdea()
+      idea = idea or @mapModel.getIdea()
       map =
-        id: idea.id
-        value: idea.title
-        type: idea.attr.type
-        classes: idea.attr.classes
-        children: @idea2map idea for idea in idea.sortedSubIdeas()
+        _id: idea.id
+        _value: idea.title
+        _attr: idea.attr
+        _children: @idea2map idea for idea in idea.sortedSubIdeas()
       return map
 
-    map2triples: (map) ->
-      triples = []
-      triples.push
-        subject: map.id
-        predicate: 'value'
-        object: map.value
-      triples.push
-        subject: map.id
-        predicate: 'type'
-        object: map.type
-      for c in map.classes
-        triples.push
-          subject: map.id
-          predicate: 'class'
-          object: c
-      if map.children.length == 0
-        return triples
-      for child in map.children
-        if !child.id then console.log map
-        triples.push
-          subject: map.id
-          predicate: 'contains'
-          object: child.id
-        triples = triples.concat @map2triples child
+    #Map <=> Triples
+    map2triples: (map,triples) ->
+      if !map?._id? then return []
+      triples = triples or [{
+          subject: map._id
+          predicate: 'path'
+          object: map._id
+          value: map._id.split(':')[0]
+          type: 'Block'
+          classes: []
+          digest: map.digest
+        }]
+      keys = Object.getOwnPropertyNames(map._children)
+      if keys? and keys.length?
+        for key in keys
+          if map._children[key]? and map._children[key].length?
+            for child in map._children[key]
+              if child?
+                triples.push
+                  subject: map._id
+                  predicate: key
+                  object: child._id
+                  value: if child._value? then child._value
+                  type: child._attr.type
+                  classes: child._attr.classes
+                @map2triples child,triples
       return triples
-
-    triples2map: (id,values,types,classes,contains) ->
-      children = []
-      if contains[id]?
-        for kid in contains[id]
-          children.push @triples2map(kid,values,types,classes,contains)
+    triples2map: (triples) ->
+      values = {}
+      attrs = {}
+      edges = {}
+      for row in triples
+        if row.predicate == 'path'
+          root = row.subject
+          digest = row.digest
+        else if edges[row.subject]?
+          if edges[row.subject][row.predicate]?
+            edges[row.subject][row.predicate].push row.object
+          else
+            edges[row.subject][row.predicate] = [row.object]
+        else
+          edges[row.subject] = {}
+          edges[row.subject][row.predicate] = [row.object]
+        values[row.object] = row.value
+        attrs[row.object] =
+          edge: row.predicate
+          type: row.type
+          classes: row.classes
+      return @buildMap(root,values,attrs,edges,digest)
+    buildMap: (id,values,attrs,edges,digest) ->
+      children = {}
+      if edges[id]?
+        keys = Object.getOwnPropertyNames(edges[id])
+        for key in keys
+          children[key] = []
+          for kid in edges[id][key]
+            children[key].push @buildMap(kid,values,attrs,edges)
       map =
-        id: id
-        value: values[id]
-        type: types[id]
-        classes: classes[id]
-        children: children
+        _id: id
+        _value: values[id]
+        _attr: attrs[id]
+        _children: children
+      if digest? then map.digest = digest
       return map

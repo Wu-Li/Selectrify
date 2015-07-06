@@ -1,7 +1,6 @@
 ChemistryView = require './chemistry-view'
 {CompositeDisposable} = require 'atom'
 Chemist = require('./chemist')
-root.Datacule = Datacule = require('./datacule')
 
 module.exports = Chemistry =
   chemistryView: null
@@ -15,19 +14,13 @@ module.exports = Chemistry =
     @subscriptions = new CompositeDisposable
     @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:toggle': => @toggle()
 
-    chemist = window.chemist = new Chemist('chemistry')
-    @subscriptions.add atom.workspace.observePaneItems (paneItem) =>
-      if paneItem?.getPath?()? and paneItem.getTitle()?.split('.').pop() == 'coffee'
-        if paneItem.getTitle() == 'coffeescript.coffee' then return
-        chemist.loadItem(paneItem)
-    @subscriptions.add atom.workspace.observeActivePaneItem (paneItem) =>
-      if paneItem?.getPath?()? and paneItem.getTitle()?.split('.').pop() == 'coffee'
-        if paneItem.getTitle() == 'coffeescript.coffee' then return
-        chemist.tab(paneItem)
-    @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:draw': => chemist.draw()
+    chemist = window.chemist = new Chemist atom.project.getPaths()
+    @subscriptions.add atom.project.onDidChangePaths (projectPaths) => chemist.loadProject(projectPaths)
+    @subscriptions.add atom.workspace.observePaneItems (paneItem) => chemist.loadItem(paneItem)
+    @subscriptions.add atom.workspace.observeActivePaneItem (paneItem) => chemist.tab(paneItem)
+    @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:draw': => chemist.activate()
     @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:save': => chemist.save()
     @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:select': => chemist.select()
-    @subscriptions.add atom.commands.add 'atom-workspace', 'chemistry:trace': => chemist.trace()
 
   deactivate: ->
     @modalPanel.destroy()

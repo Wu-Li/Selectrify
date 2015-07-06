@@ -10,6 +10,5 @@
 'atom-workspace':
   'ctrl-alt-o': 'chemistry:toggle'
   'ctrl-alt-d': 'chemistry:draw'
-  'ctrl-alt-t': 'chemistry:trace'
   'ctrl-alt-l': 'chemistry:select'
   'ctrl-alt-v': 'chemistry:save'
