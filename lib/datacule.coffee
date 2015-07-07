@@ -8,6 +8,7 @@ module.exports =
       @parse = parsers[@grammar]
       @item?.getBuffer().onDidSave @refresh
       @active = false
+      @logs = true
       @query =
         filter: (triple) =>
           triple.subject.split(':')[0] == @path
@@ -19,7 +20,7 @@ module.exports =
     init: (err,results) =>
       if err then console.log err
       if results.length? and results.length > 0
-        #console.log "#{@path} returned #{results.length} rows"
+        if @logs then console.log "#{@path} returned #{results.length} rows"
         @map = chemist.triples2map(results)
         @refresh()
       else
@@ -47,7 +48,7 @@ module.exports =
           @db.del results, (err) =>
             if err? then console.log err
             else
-              #console.log "deleted #{results.length} rows from #{@path}"
+              if @logs then console.log "deleted #{results.length} rows from #{@path}"
               @insert(replace)
         else @insert(replace)
       return
@@ -56,7 +57,7 @@ module.exports =
       stream = @db.putStream()
       count = 0
       stream.on "close", =>
-        #console.log "saved #{count} rows to #{@path}"
+        if @logs then console.log "saved #{count} rows to #{@path}"
         @select()
       for row in triples
         stream.write(row)

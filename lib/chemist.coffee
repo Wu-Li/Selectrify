@@ -3,6 +3,7 @@ MAPJS = require './mapjs/mapjs'
 levelgraph = require '../js/levelgraph.min'
 Datacule = require './datacule'
 Cursor = require './db/cursor'
+spin = require '../js/spin.min'
 
 module.exports =
   class Chemist
@@ -14,6 +15,8 @@ module.exports =
       @activeMap = undefined
       @cursor = new Cursor()
 
+    spin: spin
+    
     loadProject: (projectPaths) ->
       openDirectories = Object.getOwnPropertyNames(@directories)
       for path in projectPaths
@@ -82,20 +85,31 @@ module.exports =
             else console.log "deleted #{r.length} rows from #{path}"
 
     #Map <=> Idea
+    first: ['args']
     map2idea: (map) ->
       subIdeas = {}
       keys = Object.getOwnPropertyNames(map._children)
+      after = []
       for key in keys
-        for child in map._children[key]
-          kid = child._id.split(':')[1]
-          if key == 'chain' then kid = kid * 32
-          subIdeas[kid] = @map2idea child
+        if key in @first
+          [subIdeas,maxId] = @mapEdge(map,key,subIdeas)
+        else after.push key
+      for key in after
+        subIdeas = @mapEdge(map,key,subIdeas,maxId)[0]
       idea =
         id: map._id.split(':')[1]
         title: map._value
         attr: map._attr
         ideas: subIdeas
       return idea
+    mapEdge: (map,key,subIdeas,minId) ->
+      maxId = 0
+      minId = minId or 0
+      for child in map._children[key]
+        kid = child._id.split(':')[1] + minId
+        maxId = Math.max(maxId,kid)
+        subIdeas[kid] = @map2idea child
+      return [subIdeas,maxId]
     idea2map: (idea) ->
       idea = idea or @mapModel.getIdea()
       map =

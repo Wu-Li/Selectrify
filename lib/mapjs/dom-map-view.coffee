@@ -10,7 +10,7 @@ MAPJS.DOMRender =
     }
   dummyTextBox: $('<div>').addClass('mapjs-node').css(
     position: 'absolute'
-    visibility: 'hidden') 
+    visibility: 'hidden')
   dimensionProvider: (idea, level) ->
     textBox = $(document).nodeWithId(idea.id)
     translateToPixel = ->
@@ -19,12 +19,10 @@ MAPJS.DOMRender =
     if textBox and textBox.length > 0
       if _.isEqual(textBox.data('nodeCacheMark'), MAPJS.DOMRender.nodeCacheMark(idea, level))
         return _.pick(textBox.data(), 'width', 'height')
-    textBox = MAPJS.DOMRender.dummyTextBox
-    textBox.attr('mapjs-level', level).appendTo('body').updateNodeContent idea, translateToPixel
+    lines = Math.ceil(idea.title.length / 100)
     result =
-      width: textBox[0].offsetWidth - 6
-      height: textBox.outerHeight true
-    textBox.detach()
+      width: Math.min(idea.title.length * 8 + 12,812)
+      height: lines * 21 - 7
     result
   layoutCalculator: (contentAggregate) ->
     MAPJS.calculateLayout contentAggregate, MAPJS.DOMRender.dimensionProvider
@@ -511,17 +509,17 @@ $.fn.updateNodeContent = (nodeContent, resourceTranslator) ->
   self.attr nodeContent.attr or {}
   self.attr 'mapjs-level', nodeContent.level
   updateText nodeContent.title
-  applyLinkUrl nodeContent.title
-  applyLabel nodeContent.label
-  applyAttachment()
+  # applyLinkUrl nodeContent.title
+  # applyLabel nodeContent.label
+  # applyAttachment()
   self.data(
     'x': Math.round(nodeContent.x)
     'y': Math.round(nodeContent.y)
     'width': Math.round(nodeContent.width)
     'height': Math.round(nodeContent.height)
     'nodeId': nodeContent.id).addNodeCacheMark nodeContent
-  setColors()
-  setIcon nodeContent.attr and nodeContent.attr.icon
+  # setColors()
+  # setIcon nodeContent.attr and nodeContent.attr.icon
   setClasses()
   setCollapseClass()
   self
@@ -870,6 +868,7 @@ MAPJS.DOMRender.viewController = (mapModel, stageElement, touchEnabled, imageIns
     viewToStageCoordinates viewPort.innerWidth() / 2, viewPort.innerHeight() / 2
 
   ensureNodeVisible = (domElement) ->
+    return #CHEM
     if !domElement or domElement.length == 0
       return
     viewPort.finish()

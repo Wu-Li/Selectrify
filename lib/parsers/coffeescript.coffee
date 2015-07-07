@@ -10,6 +10,7 @@ module.exports =
   parse: (prefix,text) ->
     root.AST = AST = nodes text
     nextId = genIdCounter(prefix)
+    stack = []
     map = new CoffeeNode(AST, 'file', nextId, false)
     map._value = @path
     return map
@@ -53,14 +54,22 @@ class CoffeeNode
             @_attr.classes.push 'entity','name','function'
           else
             @_attr.classes.push 'variable','assignment'
-        if @collapse
-          @soak('value',false,' ')
+          if @collapse
+            @soak('value',false,' ')
+          assigns = @_value.split(' ')[0].split(':')[0].split('.')
+          if assigns[0] == 'module' and assigns[1] == 'exports'
+            if assigns.length > 2
+              exportVar = assigns[2..].join('.')
       when 'Bool' #(val)
         @_value = node.val
         @_attr.classes.push 'constant','boolean'
         @_attr.type = 'boolean'
       when 'Call' #args,variable; + caller
-        if @soak('variable',false,'','','(')
+        if node.do
+          @_value = 'do'
+          @_children.args = []
+          @_attr.classes.push 'keyword','control'
+        else if @soak('variable',false,'','','(')
           if @_value.slice(0,1) == '@'
             @_attr.classes.push 'variable','other','readwrite','instance'
           else
@@ -315,8 +324,3 @@ fixCases = (node) ->
     value.properties.push block
     cases.push value
   return cases.reverse()
-
-# clone = (x) ->
-#   y = x.constructor()
-#   y[x.constructor.name] = x
-#   JSON.parse JSON.stringify(y)
