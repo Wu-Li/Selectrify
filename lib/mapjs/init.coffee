@@ -2,17 +2,17 @@ $.fx.off = true
 $ ->
   bgc = $('atom-text-editor').css('background-color')
   try $('<style>.mapjs-node{background-color:' + bgc + ';}</style>').appendTo(laboratory)
-  $('#query').bind 'input', (evt) ->
+  $('#queryBox').bind 'input', (evt) ->
     chemist.cursor.text = @innerText
-  $('#query').on 'keypress', (evt) ->
+  $('#queryBox').on 'keypress', (evt) ->
     if evt.ctrlKey and evt.charCode = 13
-      chemist.get();
+      chemist.select();
 
 MAPJS.init = (idea)->
   container = $("#laboratory")
   if !idea
     idea = MAPJS.content
-      title: "Chemistry"
+      title: "Selectrify"
   mapModel = new (MAPJS.MapModel)(MAPJS.DOMRender.layoutCalculator, [])
   imageInsertController = new (MAPJS.ImageInsertController)('http://localhost:4999?u=')
   container.domMapWidget console, mapModel, false, imageInsertController

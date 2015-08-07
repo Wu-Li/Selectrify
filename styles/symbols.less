@@ -39,15 +39,15 @@
   margin-left: -3px;
   border-left-color: rgba(200,100,100,.4);
 }
+.mapjs-node.attempt {
+  border-left-width: 3px;
+  border-left-color: rgba(200,100,200,.5);
+}
 .mapjs-node.call {
   border-left-width: 6px;
   margin-left: -6px;
   border-top-left-radius: 25px;
   border-bottom-left-radius: 25px;
-}
-.mapjs-node.attempt {
-  border-top-width: 2px;
-  border-top-color: rgba(200,100,200,.5);
 }
 .mapjs-node.recovery {
   border-top-width: 2px;
@@ -56,4 +56,47 @@
 .mapjs-node.ensure {
   border-top-width: 2px;
   border-top-color: rgba(100,200,200,.5);
+}
+
+// HTML
+.mapjs-node.html.elements {
+  border-left-width: 5px;
+  border-top-left-radius: 15px;
+  border-bottom-left-radius: 15px;
+  border-color: rgba(150,100,100,.5);
+}
+.mapjs-node.html.elements.no-attributes {
+  border-right-width: 5px;
+  border-top-right-radius: 15px;
+  border-bottom-right-radius: 15px;
+}
+.mapjs-node.html.attributes {
+  border-top-left-radius: 15px;
+  border-left-width: 3px;
+  border-right-width: 2px;
+  border-right-style: dotted;
+  border-color: rgba(150,100,100,.8);
+}
+.mapjs-node.html.values {
+  border-bottom-right-radius: 15px;
+  border-right-width: 3px;
+  border-color: rgba(150,100,100,.8);
+}
+
+// Less & CSS
+.mapjs-node.less.selector {
+  border-left-width: 3px;
+  border-color: rgba(100,100,150,.5);
+}
+.mapjs-node.less.property {
+  border-top-left-radius: 15px;
+  border-left-width: 3px;
+  border-right-width: 2px;
+  border-right-style: dotted;
+  border-color: rgba(100,100,150,.8);
+}
+.mapjs-node.less.value {
+  border-bottom-right-radius: 15px;
+  border-right-width: 3px;
+  border-color: rgba(100,100,150,.8);
 }

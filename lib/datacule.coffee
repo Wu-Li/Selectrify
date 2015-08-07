@@ -1,85 +1,72 @@
-parsers =
-  coffee: require('./parsers/coffeescript').parse
+MapDB = require './db/mapdb'
 
 module.exports =
   class Datacule
-    constructor: (@db,@path,@file,@item) ->
-      @grammar = @file.getBaseName().split('.').pop()
-      @parse = parsers[@grammar]
-      @item?.getBuffer().onDidSave @refresh
-      @active = false
-      @logs = true
-      @query =
-        filter: (triple) =>
-          triple.subject.split(':')[0] == @path
-      if @file.existsSync()
-        @db.get @query, @init
-        @file.onDidDelete @remove
-      else @remove()
-
-    init: (err,results) =>
-      if err then console.log err
-      if results.length? and results.length > 0
-        if @logs then console.log "#{@path} returned #{results.length} rows"
-        @map = chemist.triples2map(results)
-        @refresh()
-      else
-        @refresh()
-
-    refresh: () =>
-      if text = @newText()
-        map = @parse @path,text
-        map.digest = @file.getDigestSync()
-        @remove map
-      else
-        @select()
-    newText: () =>
-      if @item?.getBuffer().previousModifiedStatus
-        return @item.getText()
+    constructor: (@dir,@path,@file,@item) ->
+      if chemist.logs then console.log ">>> initializing #{@path} ..."
+      chemist.spin @path
+      @grammar = @path.split('.').pop()
+      @parse = require('./parsers/parsers').parsers[@grammar]
+      @deparse = require('./parsers/parsers').deparsers[@grammar]
+      @item?.getBuffer().onDidSave => @refresh()
+      @file.onDidDelete @remove
       text = @file.readSync(true)
-      if @file.getDigestSync() != @map?.digest
-        return text
-      return false
+      digest = @file.getDigestSync()
+      @parse(@path,text).then (map) =>
+        map = chemist.Map(map)
+        @db = new MapDB @dir,@path,map,digest
+        @db.ready.then @finish,@fail
 
-    remove: (replace) =>
-      @db.get @query, (err,results) =>
-        if err? then console.log err
-        if results.length > 0
-          @db.del results, (err) =>
-            if err? then console.log err
-            else
-              if @logs then console.log "deleted #{results.length} rows from #{@path}"
-              @insert(replace)
-        else @insert(replace)
-      return
-    insert: (map) =>
-      triples = chemist.map2triples(map)
-      stream = @db.putStream()
-      count = 0
-      stream.on "close", =>
-        if @logs then console.log "saved #{count} rows to #{@path}"
-        @select()
-      for row in triples
-        stream.write(row)
-        count += 1
-      stream.end()
-      return
-    select: () =>
-      @db.get @query, (err,results) =>
-        if err then console.log err
-        else if results.length? and results.length > 0
-          @map = chemist.triples2map(results)
-          if @active then chemist.draw(@map)
-        #else console.log 'no matches found'
+    refresh: =>
+      chemist.spin @path
+      if chemist.logs then console.log "refreshing #{@path} ..."
+      if @item?.getBuffer().previousModifiedStatus
+        text = @item.getText()
+      else
+        text = @file.readSync(true)
+        digest = @file.getDigestSync()
+      @parse(@path,text)
+      .then (map) =>
+        map = chemist.Map(map)
+        @db.update map,digest
+      .then @finish,@fail
       return
 
-    #console out
-    get: (cursor) =>
-     cursor.run @db,@path, (e,r) =>
-        if e then console.log e
-        else if r.length? and r.length > 0
-          for row in r
-            console.log row
-          console.log r.length
-        else
-          console.log 'no matches found'
+    finish: (@map) =>
+      if chemist.logs then console.log "<<< completed #{@path}"
+      if @active then chemist.draw @map
+      chemist.stop @path
+      @getImports()
+      return
+    fail: (error) =>
+      console.error @path,error
+      chemist.stop(@path)
+      return
+
+    getText: => @deparse @map
+    get: => @db.get()
+    remove: => @db.remove()
+    insert: (map) => @db.insert(map)
+
+    getImports: ->
+      for parentId in Object.getOwnPropertyNames @db.imports
+        pid = Number(parentId.split(':')[1])
+        relPath = @db.imports[parentId].path
+        name = @db.imports[parentId].name
+        @import pid,relPath,name
+
+    import: (pid,relPath,name) ->
+      getImport = (expDb,name) =>
+        expDb.children[name].get().then (map) =>
+          if chemist.logs then console.log "importing:",pid,relPath,map,name
+          if @active then chemist.drawAt(pid,map)
+          return
+      if expPath = chemist.repath(@path,relPath)
+        if chemist.logs then console.log "Linking: #{expPath}"
+        chemist.loadFile(@dir,expPath).then =>
+          expDb = @dir.datacules[expPath].db
+          if name? then getImport(expDb,name)
+          else
+            for key in keys = Object.getOwnPropertyNames(expDb.children)
+              getImport(expDb,key)
+      return

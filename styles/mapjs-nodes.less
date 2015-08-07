@@ -1,5 +1,5 @@
 .mapjs-node {
-	margin: -6px 0;
+	margin: -6px -3px;
 	padding: 2px 6px;
 	background-color: rgba(200,200,200,.2);
 	border-radius: 2px;
@@ -13,6 +13,7 @@
 	cursor: hand;
 	box-sizing: border-box;
 	white-space: pre-line;
+	word-break: break-all;
 	max-width: 800px;
 	span {
 		white-space: pre-word;
@@ -106,8 +107,9 @@
 	opacity: 0.4;
 }
 .mapjs-node.collapsed {
-	box-shadow: 3px 3px 0 #A0A0A0, 4px 4px 0 #333, 6px 6px 0 #707070, 7px 7px 0 #222;
-	margin: 4px;
+	box-shadow: 3px 3px 0 #888, 4px 4px 0 #555,
+	6px 6px 0 #777, 7px 7px 0 #444;
+	// margin: 4px;
 }
 .mapjs-node.collapsed.selected {
 	box-shadow: 4px 4px 0 #A0A0A0, 5px 5px 0 #333, 8px 8px 0 #707070, 9px 9px 0 #222, 12px 12px 5px black;

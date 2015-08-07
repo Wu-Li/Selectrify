@@ -1,22 +1,25 @@
 {
-  "name": "chemistry",
-  "main": "./lib/chemistry",
+  "name": "selectrify",
+  "main": "./lib/selectrify",
   "version": "0.0.0",
   "description": "A short description of your package",
-  "keywords": [
-  ],
-  "activationCommands": {
-  },
-  "repository": "https://github.com/atom/chemistry",
+  "keywords": [],
+  "activationCommands": {},
+  "repository": "https://github.com/atom/selectrify",
   "license": "MIT",
   "engines": {
     "atom": ">=0.207.0 <2.0.0"
   },
   "dependencies": {
+    "atom-space-pen-views": "latest",
     "coffee-script": "latest",
-    "atom-space-pen-views": "latest"
+    "less": "latest",
+    "level-js": "^2.2.1",
+    "level-sublevel": "^6.4.6",
+    "levelgraph": "^1.0.0",
+    "levelup": "^1.2.1"
   },
   "comments": {
-    "atom-workspace": "chemistry:toggle"
+    "atom-workspace": "selectrify:toggle"
   }
 }

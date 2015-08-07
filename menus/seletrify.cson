@@ -2,23 +2,27 @@
 'context-menu':
   'atom-text-editor': [
     {
-      'label': 'Toggle chemistry'
-      'command': 'chemistry:toggle'
+      'label': 'Toggle Selectrify'
+      'command': 'selectrify:toggle'
     }
     {
       'label': 'Draw Datacule'
-      'command': 'chemistry:draw'
+      'command': 'selectrify:draw'
     }
   ]
 'menu': [
   {
     'label': 'Packages'
     'submenu': [
-      'label': 'chemistry'
+      'label': 'Selectrify'
       'submenu': [
         {
           'label': 'Toggle'
-          'command': 'chemistry:toggle'
+          'command': 'selectrify:toggle'
+        }
+        {
+          'label': 'Draw'
+          'command': 'selectrify:draw'
         }
       ]
     ]

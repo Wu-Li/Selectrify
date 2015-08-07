@@ -8,7 +8,6 @@
 # For more detailed documentation see
 # https://atom.io/docs/latest/behind-atom-keymaps-in-depth
 'atom-workspace':
-  'ctrl-alt-o': 'chemistry:toggle'
-  'ctrl-alt-d': 'chemistry:draw'
-  'ctrl-alt-l': 'chemistry:select'
-  'ctrl-alt-v': 'chemistry:save'
+  'ctrl-`': 'selectrify:toggle'
+  'alt-`': 'selectrify:draw'
+  'alt-~': 'selectrify:get'

@@ -19,10 +19,16 @@ MAPJS.DOMRender =
     if textBox and textBox.length > 0
       if _.isEqual(textBox.data('nodeCacheMark'), MAPJS.DOMRender.nodeCacheMark(idea, level))
         return _.pick(textBox.data(), 'width', 'height')
-    lines = Math.ceil(idea.title.length / 100)
+    breaks = (idea.title.match(/\n/g) or []).length + 1
+    lines = idea.title.split("\n")
+    lengths = []
+    for line in lines
+      lengths.push line.length
+      breaks += Math.floor((line.length - 1) / 100)
+    longest = Math.max.apply(Math,lengths)
     result =
-      width: Math.min(idea.title.length * 8 + 12,812)
-      height: lines * 21 - 7
+      width: Math.min(longest * 8 + 6, 806)
+      height: breaks * 21 - 7
     result
   layoutCalculator: (contentAggregate) ->
     MAPJS.calculateLayout contentAggregate, MAPJS.DOMRender.dimensionProvider
@@ -97,8 +103,9 @@ $.fn.updateStage = ->
     'width': Math.round(data.width - (data.offsetX))
     'height': Math.round(data.height - (data.offsetY))
     'transform-origin': 'top left'
-    'transform': 'translate3d(' + Math.round(data.offsetX * 0.5) + 'px, ' + Math.round(data.offsetY * 0.5) + 'px, 0)'
-    # 'transform': 'translate3d(' + Math.round(data.offsetX) + 'px, ' + Math.round(data.offsetY) + 'px, 0)'
+    # 'transform': 'translate3d(' + Math.round(data.offsetX * 0.5) + 'px, ' + Math.round(data.offsetY * 0.25) + 'px, 0)'
+    # 'transform': 'translate3d(' + Math.round(data.offsetX * 0.5) + 'px, ' + Math.round(data.offsetY * 0.5) + 'px, 0)'
+    'transform': 'translate3d(' + Math.round(data.offsetX) + 'px, ' + Math.round(data.offsetY) + 'px, 0)'
   if data.scale and data.scale != 1
     size.transform = 'scale(' + data.scale + ') translate(' + Math.round(data.offsetX) + 'px, ' + Math.round(data.offsetY) + 'px)'
   @css size
@@ -703,7 +710,7 @@ do ->
     cleanDOMId 'node_' + id
 
   $.fn.createNode = (node) ->
-    $('<div>').attr(
+    $('<div>').attr( #CHEM
       'id': nodeKey(node.id)
       'tabindex': 0
       'data-mapjs-role': 'node').css(
@@ -752,6 +759,7 @@ MAPJS.DOMRender.viewController = (mapModel, stageElement, touchEnabled, imageIns
   viewPort = stageElement.parent()
   connectorsForAnimation = $()
   linksForAnimation = $()
+  currentDroppable = undefined
   nodeAnimOptions =
     duration: 400
     queue: 'nodeQueue'

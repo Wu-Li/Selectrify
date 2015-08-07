@@ -1,10 +1,10 @@
 {$, View} = require('atom-space-pen-views')
 
 module.exports =
-class ChemistryView extends View
+class SelectrifyView extends View
   @content: ->
-    @div class: "chemistry" , =>
-      @div class: "chemistry-resize-handle"
+    @div class: "selectrify" , => 
+      @div class: "selectrify-resize-handle"
       @div class: "tray", =>
         @button class: 'scaleUp'
         @button class: 'scaleDown'
@@ -20,13 +20,13 @@ class ChemistryView extends View
           @label 'types', for: 'types', =>
             @input type: 'checkbox', id: 'types', class: 'toggleTypes'
             @span ''
-        @label 'query', for: 'query'
-        @div id: 'query', class: 'native-key-bindings', contentEditable: 'true'
+        @label 'query', for: 'queryBox'
+        @div id: 'queryBox', class: 'native-key-bindings', contentEditable: 'true'
 
       @div id: "laboratory"
 
   initialize: (state) ->
-    @on 'mousedown', '.chemistry-resize-handle', (e) => @resizeStarted(e)
+    @on 'mousedown', '.selectrify-resize-handle', (e) => @resizeStarted(e)
 
   attached: ->
     @focus()
@@ -43,14 +43,14 @@ class ChemistryView extends View
     @element
 
   resizeStarted: =>
-    $(document).on('mousemove', @resizeChemistry)
+    $(document).on('mousemove', @resizeselectrify)
     $(document).on('mouseup', @resizeStopped)
 
   resizeStopped: =>
-    $(document).off('mousemove', @resizeChemistry)
+    $(document).off('mousemove', @resizeselectrify)
     $(document).off('mouseup', @resizeStopped)
 
-  resizeChemistry: ({pageX, which}) =>
+  resizeselectrify: ({pageX, which}) =>
     return @resizeStopped() unless which is 1
     width = $(document.body).width() - pageX
     @width(width)

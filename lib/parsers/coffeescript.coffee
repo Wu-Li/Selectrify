@@ -1,275 +1,62 @@
 {nodes} = require 'coffee-script'
 
-genIdCounter = (prefix) ->
-  currentId = 0
-  nextId = () -> prefix + ':' + (currentId += 1)
-
 stack = []
+path = ''
 
 module.exports =
   parse: (prefix,text) ->
-    root.AST = AST = nodes text
-    nextId = genIdCounter(prefix)
+    dfd = $.Deferred()
+    root.AST = nodes text
     stack = []
-    map = new CoffeeNode(AST, 'file', nextId, false)
-    map._value = @path
-    return map
+    map = new CoffeeMap AST,'file',false
+    map.attr.root = true
+    map.attr.value = prefix
+    setIds(prefix,map)
+    dfd.resolve map
+    return dfd.promise()
 
-class CoffeeNode
-  constructor: (node,edge,@nextId,@collapse) ->
-    @_id = @nextId()
-    @_attr =
+  deparse: (map) ->
+    ct = new CoffeeBlock map,0
+    return ct.text
+
+setIds = (prefix,map) ->
+  currentId = 0
+  nextId = (map) =>
+    map.id = prefix + ':' + (currentId += 1)
+    keys = Object.getOwnPropertyNames(map.children)
+    for key in keys
+      for child in map.children[key]
+        nextId(child)
+  nextId(map)
+
+genPositioner = ->
+  order = 0
+  nextPos = -> order += 1
+
+class CoffeeMap
+  constructor: (node,edge,@collapse) ->
+    @attr =
+      value: ''
       edge: edge
       type: node.constructor.name
       classes: ['coffee']
-    @_value = ''
     @setCollapse(edge)
-    @getChildren(node)
+    @setChildren(node)
     @process(node)
-
-  process: (node) ->
-    switch @_attr.type
-      when 'Access' #name
-        @soak('name',true,'.')
-        if @_value == '.prototype'
-          @_value = '::'
-      when 'Arr' #objects
-        if @collapse
-          if !@soak('objects',true,'[',', ',']')
-            @_value = '[]'
-        else
-          if @_children.objects.length == 0
-            @_value = '[]'
-          else @_value = '['
-          @_attr.classes.push 'keyword','operator'
-        @_attr.classes.push 'array'
-        @_attr.type = 'Array'
-      when 'Assign' #value,variable,(context)
-        node.context = switch node.context
-          when 'object' then ':'
-          when undefined then ' ='
-          else ' ' + node.context
-        if @soak('variable',false,'','',"#{node.context}")
-          if @_children.value[0]?._attr.type == 'Code'
-            @_attr.classes.push 'entity','name','function'
-          else
-            @_attr.classes.push 'variable','assignment'
-          if @collapse
-            @soak('value',false,' ')
-          assigns = @_value.split(' ')[0].split(':')[0].split('.')
-          if assigns[0] == 'module' and assigns[1] == 'exports'
-            if assigns.length > 2
-              exportVar = assigns[2..].join('.')
-      when 'Bool' #(val)
-        @_value = node.val
-        @_attr.classes.push 'constant','boolean'
-        @_attr.type = 'boolean'
-      when 'Call' #args,variable; + caller
-        if node.do
-          @_value = 'do'
-          @_children.args = []
-          @_attr.classes.push 'keyword','control'
-        else if @soak('variable',false,'','','(')
-          if @_value.slice(0,1) == '@'
-            @_attr.classes.push 'variable','other','readwrite','instance'
-          else
-            @_attr.classes.push 'support','function'
-          @_attr.classes.push 'call'
-          if @_children.args.length == 0
-            @_value += ')'
-          else if @collapse
-            @soak('args',false,'',',',')')
-        else if !@_children.variable[0]?
-          @soak('properties',true,')','')
-      when 'Class' #variable,parent,body
-        if @soak('variable',false,'class ')
-          @soak('parent',false,' extends ')
-          @_attr.classes.push 'meta','class'
-      when 'Code' #params,body,(bound)
-        @soak('params',false,'(',',',')')
-        if node.bound
-          @_value += ' =>'
-        else
-          @_value += ' ->'
-        @_attr.classes.push 'variable','parameter'
-      when 'Comment'
-        @_attr.classes.push 'comment'
-      when 'Existence' #expression
-        @soak('expression',true,'','','?')
-      when 'Expansion'
-        @_value = '...'
-        @_attr.classes.push 'keyword','operator'
-      when 'For' #name,source,step,guard,body
-        if @soak('source',false,"for#{node.name} in ")
-          @_attr.classes.push 'keyword'
-      when 'If' #condition,body,elseBody
-        if @soak('condition',false,'if ')
-          @_attr.classes.push 'if','keyword'
-          for child in @_children.body
-            child._attr.classes.push 'true'
-        if @_children.elseBody.length > 0
-          @_children.elseBody[0]._value = 'else'
-          @_children.elseBody[0]._attr.classes.push 'else','keyword'
-      when 'In' #object,array
-        if @soak('object',false,'','',' in')
-          @soak('array')
-        else
-          @_value = 'in'
-        @_attr.classes.push 'keyword'
-      when 'Index' #index
-        @soak('index',true,'[','',']')
-      when 'Literal' #(value)
-        @_value = node.value
-        if isNaN(Number(@_value))
-          if @_value.slice(0,1) in ['"',"'"]
-            @_attr.classes.push 'string','quoted'
-            @_attr.type = 'string'
-          else if @_value == 'this'
-            @_value = '@'
-            @_attr.classes.push 'variable','instance'
-            @_attr.type = 'variable'
-          else if @_value == 'break'
-            @_attr.classes.push 'keyword','control'
-            @_attr.type = 'Break'
-          else
-            @_attr.classes.push 'variable','parameter'
-            @_attr.type = 'variable'
-        else
-          @_attr.type = typeof Number @_value
-          @_attr.classes.push 'constant','numeric'
-      when 'Null'
-        @_value = 'null'
-        @_attr.type = 'Object'
-      when 'Obj' #properties
-        if !@soak('properties',false,'{',',','}')
-          if @_children.properties.length == 0
-            @_value = '{}'
-          else
-            @_value = '{'
-          @_attr.classes.push 'keyword','operator'
-          @_attr.type = 'Object'
-      when 'Op' #second,first,(operator)
-        if node.operator == '&&' then operator = 'and'
-        else if node.operator == '||' then operator = 'or'
-        else operator = node.operator
-        first = @_children.first[0]
-        second = @_children.second[0]
-        if @complex('first') or @complex('second')
-          @_value = operator
-          @_attr.classes.push 'keyword','operator'
-          #Stack multiple same operators
-          if operator == first._value and !@collapse
-            first._children.second.push @_children.second.pop()
-            first._children.second.push first._children.second.pop()
-            @_children.second = first._children.second
-            @_children.first = first._children.first
-        else
-          @soak('first',true)
-          if @_children.second?
-            @soak('second',true," #{operator} ")
-          else
-            @_value = "#{operator}#{@_value}"
-          @_attr.type = 'Expression'
-      when 'Param' #value,name
-        if @soak('name')
-          if node.splat
-            @_value += '...'
-          @soak('value',false,'=')
-      when 'Parens' #body
-        @_value = '('
-        @_attr.classes.push 'keyword','operator'
-      when 'Range' #from,to,(exclusive)
-        dots = if node.exclusive then '...' else '..'
-        @soak('from',true,'','',dots)
-        @soak('to')
-      when 'Return' #expression
-        if !@soak('expression',false,'return ')
-          @_value = 'return'
-        @_attr.classes.push 'keyword','control','return'
-      when 'Slice' #range
-        @soak('range',true,'[','',']')
-      when 'Splat' #name
-        @soak('name',true,'','','...')
-      when 'Switch' #subject,cases,otherwise
-        if @soak('subject',false,'switch ')
-          @_attr.classes.push 'switch','keyword'
-      when 'Throw' #expression
-        @soak('expression',false,'throw ')
-        @_attr.classes.push 'keyword'
-      when 'Try' #attempt,recovery,ensure,(errorVariable)
-        @_value = 'try'
-        @_attr.classes.push 'keyword'
-        for child in @_children.attempt
-          child._attr.classes.push 'attempt'
-        if @_children.recovery.length > 0
-          e = node.errorVariable?.value or ''
-          @_children.recovery[0]._value = "catch #{e}"
-          @_children.recovery[0]._attr.classes.push 'recovery','keyword'
-        if @_children.ensure.length > 0
-          @_children.ensure[0]._value = "finally"
-          @_children.ensure[0]._attr.classes.push 'ensure','keyword'
-      when 'Undefined'
-        @_value = 'undefined'
-        @_attr.type = 'undefined'
-      when 'Value' #base,properties
-        if @_children.properties[0]?._value == '::'
-          @_children.properties[1]._value = @_children.properties[1]._value.slice(1)
-        if @_attr.edge == 'cases'
-          @soak('base',false,'when ')
-          @_attr.classes.push 'keyword'
-          @_attr.type = 'Case'
-        else if @soak('base',true)
-          if !@soak('properties',false,'','')
-            if @_children.properties.length == 1 and @_children.properties[0]._attr.type == 'Index'
-              @_value += '['
-              @_children.properties[0] = @_children.properties[0]._children.index[0]
-          if @_value.slice(0,2) == '@.'
-            @_value = "@#{@_value.slice(2)}"
-        else if !@_children.base[0]?
-          @soak('properties',true,')','')
-      when 'While' #condition,guard,body
-        if @soak('condition',false,'while ')
-          @_attr.classes.push 'keyword'
-      else @_value = @_attr.type.toLowerCase()
-    return
-
-  complex: (edge) ->
-    if edge?
-      for child in @_children[edge]
-        if child.complex()
-          return true
-      return false
-    else
-      keys = Object.getOwnPropertyNames(@_children)
-      if keys.length == 0 then return false
-      for key in keys
-        if @_children[key].length > 0
-          return true
-      return false
-
-  soak: (edge,soakClasses,pre='',sep=',',post='') ->
-    if @_children[edge].length == 0 or @complex(edge) then return false
-    values = []
-    while @_children[edge].length > 0
-      child = @_children[edge].pop()
-      if soakClasses
-        @_attr.type = child._attr.type
-        @_attr.classes = @_attr.classes.concat child._attr.classes
-      values.push child._value
-    @_value += "#{pre}#{values.reverse().join(sep)}#{post}"
-    return true
+    @setOrder(node)
 
   setCollapse: (edge) ->
-    if edge in ['condition','source','expression','index']
+    if edge == 'variable' and @attr.type == 'Assign' or
+    edge in ['condition','source','expression','index','subject']
       @collapse = true
 
-  getChildren: (node) ->
-    @_children = {}
+  setChildren: (node) ->
+    @children = {}
     edges = node.children.slice(0)
     if node.constructor.name == 'Call'
       edges = ['chain'].concat edges
     for edge in edges
-      @_children[edge] = []
+      @children[edge] = []
       if node[edge]?
         if node[edge].length?
           if edge == 'cases'
@@ -288,6 +75,10 @@ class CoffeeNode
     if child.constructor.name == 'Block'
       if !(edge in ['recovery','ensure','elseBody'])
         @processChildren(child.expressions,edge)
+        return
+    if child.constructor.name == 'Obj'
+      if child.generated
+        @processChildren(child.properties,edge)
         return
     if child.constructor.name == 'Value'
       if child.base?.constructor.name in ['Arr','Obj','Parens']
@@ -313,14 +104,344 @@ class CoffeeNode
     @createChild(child,edge)
 
   createChild: (child,edge) ->
-    @_children[edge].push new CoffeeNode(child,edge,@nextId,@collapse)
+    @children[edge].push new CoffeeMap child,edge,@collapse
+
+  setOrder: (node) ->
+    @nextPos = genPositioner()
+    for edge in node.children
+      for child in @children[edge]
+        child.attr.edge += ':' + child.attr.order = @nextPos()
+    if @children.chain?
+      for child in @children.chain
+        child.attr.edge += ':' + child.attr.order = @nextPos()
+
+  process: (node) ->
+    switch @attr.type
+      when 'Access' #name
+        @soak('name',true,'.')
+        if @attr.value == '.prototype'
+          @attr.value = '::'
+      when 'Arr' #objects
+        if @collapse
+          if !@soak('objects',true,'[',', ',']')
+            @attr.value = '[]'
+        else
+          if @children.objects.length == 0
+            @attr.value = '[]'
+          else @attr.value = '['
+          @attr.classes.push 'keyword','operator'
+        @attr.classes.push 'array'
+        @attr.type = 'Array'
+      when 'Assign' #value,variable,(context)
+        node.context = switch node.context
+          when 'object' then ':'
+          when undefined then ' ='
+          else ' ' + node.context
+        if @soak('variable',false,'','',"#{node.context}")
+          if @children.value[0]?.attr.type == 'Code'
+            @attr.classes.push 'entity','name','function'
+          else
+            @attr.classes.push 'variable','assignment'
+          if @collapse
+            @soak('value',false,' ')
+
+          #Exports
+          assigns = @attr.value.split(' ')[0].split(':')[0].split('.')
+          if assigns[0] == 'module' and assigns[1] == 'exports'
+            if assigns.length > 2
+              @attr.exports = assigns[2..].join('.')
+            else
+              for child in @children.value
+                if child.attr.type == 'Class'
+                  child.attr.exports = child.attr.value.split(' ')[1]
+                else
+                  child.attr.exports = child.attr.value.split(':')[0]
+
+      when 'Bool' #(val)
+        @attr.value = node.val
+        @attr.classes.push 'constant','boolean'
+        @attr.type = 'boolean'
+      when 'Call' #args,variable,do; + caller
+        if node.do
+          @attr.value = 'do'
+          @children.args = []
+          @attr.classes.push 'keyword','control'
+        else if @soak('variable',false,'','','(')
+          if @attr.value.slice(0,1) == '@'
+            @attr.classes.push 'variable','other','readwrite','instance'
+          else
+            @attr.classes.push 'support','function'
+          @attr.classes.push 'call'
+          if @collapse
+            if @children.chain.length == 0
+              close = ')'
+            else close = ''
+            @soak('args')
+            @soak('chain')
+            @attr.value += close
+          else if @children.args.length == @children.chain.length == 0
+            @attr.value += ')'
+
+          #Imports
+          if @attr.value.slice(0,7) == 'require'
+            if exportPath = @children.args[0].attr.value[1..-2]
+              if name = @children.chain[0]?.attr.value.split('.')[1]
+                @children.chain[0].attr.imports =
+                  path: exportPath
+                  name: name
+              else
+                @children.args[0].attr.imports =
+                  path: exportPath
+
+      when 'Class' #variable,parent,body
+        if @soak('variable',false,'class ')
+          @soak('parent',false,' extends ')
+          @attr.classes.push 'meta','class'
+      when 'Code' #params,body,(bound)
+        @soak('params',false,'(',',',')')
+        if node.bound
+          @attr.value += ' =>'
+        else
+          @attr.value += ' ->'
+        @attr.classes.push 'variable','parameter'
+      when 'Comment'
+        @attr.classes.push 'comment'
+      when 'Existence' #expression
+        @soak('expression',true,'','','?')
+      when 'Expansion'
+        @attr.value = '...'
+        @attr.classes.push 'keyword','operator'
+      when 'For' #name,source,step,guard,body
+        if @soak('source',false,"for#{node.name} in")
+          @attr.classes.push 'keyword'
+      when 'If' #condition,body,elseBody
+        if @soak('condition',false,'if ')
+          @attr.classes.push 'if','keyword'
+          for child in @children.body
+            child.attr.classes.push 'true'
+        if @children.elseBody.length > 0
+          @children.elseBody[0].attr.value = 'else'
+          @children.elseBody[0].attr.classes.push 'else','keyword'
+      when 'In' #object,array
+        if @soak('object',false,'','',' in ')
+          @soak('array')
+        else
+          @attr.value = 'in'
+        @attr.classes.push 'keyword'
+      when 'Index' #index
+        @soak('index',false,'[','',']')
+      when 'Literal' #(value)
+        @attr.value = node.value
+        if isNaN(Number(@attr.value))
+          if @attr.value.slice(0,1) in ['"',"'"]
+            @attr.classes.push 'string','quoted'
+            @attr.type = 'string'
+          else if @attr.value == 'this'
+            @attr.value = '@'
+            @attr.classes.push 'variable','instance'
+            @attr.type = 'variable'
+          else if @attr.value == 'break'
+            @attr.classes.push 'keyword','control'
+            @attr.type = 'Break'
+          else
+            @attr.classes.push 'variable','parameter'
+            @attr.type = 'variable'
+        else
+          @attr.type = typeof Number @attr.value
+          @attr.classes.push 'constant','numeric'
+      when 'Null'
+        @attr.value = 'null'
+        @attr.type = 'Object'
+      when 'Obj' #properties
+        if !@soak('properties',false,'{',',','}')
+          if @children.properties.length == 0
+            @attr.value = '{}'
+          else
+            @attr.value = '{'
+          @attr.classes.push 'keyword','operator'
+          @attr.type = 'Object'
+      when 'Op' #second,first,(operator)
+        if node.operator == '&&' then operator = 'and'
+        else if node.operator == '||' then operator = 'or'
+        else operator = node.operator
+        first = @children.first[0]
+        second = @children.second[0]
+        if @complex('first') or @complex('second')
+          @attr.value = operator
+          @attr.classes.push 'keyword','operator'
+          #Stack multiple same operators
+          if operator == first.attr.value and !@collapse
+            first.children.second.push @children.second.pop()
+            first.children.second.push first.children.second.pop()
+            @children.second = first.children.second
+            @children.first = first.children.first
+        else
+          @soak('first',true)
+          if @children.second?
+            @soak('second',true," #{operator} ")
+          else
+            @attr.value = "#{operator}#{@attr.value}"
+          @attr.type = 'Expression'
+      when 'Param' #value,name
+        if @soak('name')
+          if node.splat
+            @attr.value += '...'
+          @soak('value',false,'=')
+      when 'Parens' #body
+        @attr.value = '('
+        @attr.classes.push 'keyword','operator'
+      when 'Range' #from,to,(exclusive)
+        dots = if node.exclusive then '...' else '..'
+        @soak('from',true,'','',dots)
+        @soak('to')
+      when 'Return' #expression
+        if !@soak('expression',false,'return ')
+          @attr.value = 'return'
+        @attr.classes.push 'keyword','control','return'
+      when 'Slice' #range
+        @soak('range',true,'[','',']')
+      when 'Splat' #name
+        @soak('name',true,'','','...')
+      when 'Switch' #subject,cases,otherwise
+        if @soak('subject',false,'switch ')
+          @attr.classes.push 'switch','keyword'
+        if @children.otherwise.length > 0
+          @children.otherwise[0].attr.classes.push 'else'
+      when 'Throw' #expression
+        @soak('expression',false,'throw ')
+        @attr.classes.push 'keyword'
+      when 'Try' #attempt,recovery,ensure,(errorVariable)
+        @attr.value = 'try'
+        @attr.classes.push 'keyword'
+        for child in @children.attempt
+          child.attr.classes.push 'attempt'
+        if @children.recovery.length > 0
+          e = node.errorVariable?.value or ''
+          @children.recovery[0].attr.value = "catch #{e}"
+          @children.recovery[0].attr.classes.push 'recovery','keyword'
+        if @children.ensure.length > 0
+          @children.ensure[0].attr.value = "finally"
+          @children.ensure[0].attr.classes.push 'ensure','keyword'
+      when 'Undefined'
+        @attr.value = 'undefined'
+        @attr.type = 'undefined'
+      when 'Value' #base,properties
+        if @children.properties[0]?.attr.value == '::'
+          @children.properties[1].attr.value = @children.properties[1].attr.value.slice(1)
+        if @attr.edge == 'cases'
+          @soak('base',false,'when ')
+          @attr.classes.push 'keyword'
+          @attr.type = 'Case'
+        else if @soak('base',true)
+          if !@soak('properties',false,'','')
+            if @children.properties.length == 1 and @children.properties[0].attr.type == 'Index'
+              @attr.value += '['
+              @children.properties[0] = @children.properties[0].children.index[0]
+          if @attr.value.slice(0,2) == '@.'
+            @attr.value = "@#{@attr.value.slice(2)}"
+        else if !@children.base[0]?
+          @soak('properties',true,')','')
+      when 'While' #condition,guard,body
+        if @soak('condition',false,'while ')
+          @attr.classes.push 'keyword'
+      else @attr.value = @attr.type.toLowerCase()
+    return
+
+  complex: (edge) ->
+    if edge?
+      for child in @children[edge]
+        if child.complex()
+          return true
+      return false
+    else
+      keys = Object.getOwnPropertyNames(@children)
+      if keys.length == 0 then return false
+      for key in keys
+        if @children[key].length > 0
+          return true
+      return false
+
+  soak: (edge,soakClasses,pre='',sep=',',post='') ->
+    if @children[edge].length == 0 or @complex(edge) then return false
+    values = []
+    while @children[edge].length > 0
+      child = @children[edge].pop()
+      if soakClasses
+        @attr.type = child.attr.type
+        @attr.classes = @attr.classes.concat child.attr.classes
+      values.push child.attr.value
+    @attr.value += "#{pre}#{values.reverse().join(sep)}#{post}"
+    return true
 
 fixCases = (node) ->
   cases = []
   while node.cases.length > 0
     array = node.cases.pop()
     block = array.pop()
-    value = array.pop()
-    value.properties.push block
-    cases.push value
+    values = array.pop()
+    if values.length?
+      while values.length > 1
+        values[0].base.value += ',' + values.pop().base.value
+        values = values[0]
+    values.properties.push block
+    cases.push values
   return cases.reverse()
+
+sortById = (a,b) -> return a.id - b.id
+
+class CoffeeLine
+  constructor: (map,@level) ->
+    @id = Number(map.id.split(':')[1])
+    @line = Array(@level).join('\t')
+    @line += map.value
+    if map.attr.type == 'Call' and map.children.args?.length > 0
+      @line.slice(-1,1)
+    if map.attr.edge == 'args'
+      @line += ', '
+    else @line += ' '
+    @append(map.children)
+    @line += '\n'
+
+  append: (children) ->
+    edges = Object.getOwnPropertyNames(children)
+    for edge in edges
+      for child in children[edge]
+        @line += child.value
+        @append child.children
+
+class CoffeeBlock
+  constructor: (map,@level) ->
+    if @level > 0
+      @id = Number(map.id.split(':')[1])
+      @type = map.attr.type
+      if map.value == 'else'
+        @level -= 1
+      @line = Array(@level).join('\t')
+      @line += map.value
+      @line += '\n'
+    @getChildren(map.children)
+    @combineLines()
+
+  getChildren: (children) ->
+    @children = []
+    edges = Object.getOwnPropertyNames(children)
+    for edge in edges
+      for child in children[edge]
+        if child.attr.type == 'Assign' and child.children.value[0].attr.type == 'Code'
+          child.children.value[0].value = child.value + ' ' + child.children.value[0].value
+          @children.push new CoffeeBlock child.children.value[0],@level + 1
+        else if child.attr.type == 'Assign' and child.children.value[0].attr.type == 'Assign'
+          @children.push new CoffeeBlock child,@level + 1
+        else if child.attr.type in ['If','Switch','For','Case','Code','Block','While','Class','Object']
+          @children.push new CoffeeBlock child,@level + 1
+        else
+          @children.push new CoffeeLine child,@level + 1
+
+  combineLines: () ->
+    @text = @line or ''
+    @children.sort(sortById)
+    for child in @children
+      if child.text?
+        @text += child.text
+      else
+        @text += child.line

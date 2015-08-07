@@ -245,10 +245,11 @@ MAPJS.MapModel = (layoutCalculatorArg, selectAllTitles, clipboardProvider, defau
     @collapse source, !isCollapsed
     return
 
-  @collapse = (source, doCollapse) ->
+  @collapse = (source, doCollapse, contextNodeId) ->
     analytic 'collapse:' + doCollapse, source
     self.isInCollapse = true
-    contextNodeId = getCurrentlySelectedIdeaId()
+
+    contextNodeId = contextNodeId or getCurrentlySelectedIdeaId()
 
     contextNode = ->
       contextNodeId and currentLayout and currentLayout.nodes and currentLayout.nodes[contextNodeId]
@@ -267,9 +268,9 @@ MAPJS.MapModel = (layoutCalculatorArg, selectAllTitles, clipboardProvider, defau
     oldContext = contextNode()
     if isInputEnabled
       self.applyToActivated (id) ->
-        node = self.findIdeaById(id)
+        node = self.findIdeaById(contextNodeId)
         if node and (!doCollapse or node.ideas and _.size(node.ideas) > 0)
-          idea.updateAttr id, 'collapsed', doCollapse
+          idea.updateAttr contextNodeId, 'collapsed', doCollapse
         return
     newContext = contextNode()
     if oldContext and newContext
